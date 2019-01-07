@@ -110,7 +110,7 @@ public:
     // pCallback - callback to log messages
     // printCmd - print command line to stdout
     static void GenerateControlFlowGraph(const gtString& isaFileName, const gtString& outputFileName,
-                                         LoggingCallBackFunc_t pCallback, bool printCmd);
+                                         LoggingCallBackFunc_t pCallback, bool perInstCfg, bool printCmd);
 
     // Generates an output file name in the Analyzer CLI format.
     // baseOutputFileName - the base output file name as configured by the user's command
@@ -130,10 +130,12 @@ public:
     // Get all available graphics cards public names, grouped by the internal code name.
     static bool GetMarketingNameToCodenameMapping(DeviceNameMap& cardsMap);
 
-    // Tries to find a GPU architecture name that corresponds to the user-provided device name.
+    // Tries to find a GPU architecture name that corresponds to the device name provided by user ("device").
     // Returns "true" if corresponding arch is found, "false" otherwise.
-    // Returns matched architecture in "archName" (if succeeded) and text message in "msg" (if failed).
-    static bool FindGPUArchName(const std::string& deviceName, std::string& archName, std::string& msg);
+    // Returns matched architecture in "matchedDevice" (if succeeded).
+    // If "printInfo" is true, the detected device or error message will be printed to stdout/stderr.
+    // If "allowUnknownDevice" is true, no error message will be printed if "device" is not found in the list of known devices.
+    static bool FindGPUArchName(const std::string& device, std::string& matchedDevice, bool printInfo, bool allowUnknownDevice);
 
     // Check if file exists and not empty.
     // \param[in]  fileName    name of file.
@@ -212,7 +214,11 @@ public:
                                        unsigned long timeOut, bool printCmd, std::string& stdOut, std::string& stdErr, long& exitCode);
 
     // Open new CLI log file and delete old files (older than 1 week).
-    static bool  InitCLILogFile(const Config& config);
+    static bool InitCLILogFile(const Config& config);
+
+    // Case-insensitive string compare.
+    // Returns "true" if provided strings are equal or "false" otherwise.
+    static bool StrCmpNoCase(const std::string& s1, const std::string& s2);
 
 private:
     // This is a static class (no instances).

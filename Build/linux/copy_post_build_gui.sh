@@ -26,14 +26,15 @@ if [ -n "$QT_LIB_DIR" ]; then
 fi
 
 # Copy the documentation files
-if [ ! -d "../../output/bin/docs" ]; then
-    mkdir ../../output/bin/docs
+if [ ! -d "../../output/bin/Documentation" ]; then
+    mkdir ../../output/bin/Documentation
 fi
-if [ ! -d "../../output/bin/docs/html" ]; then
-    mkdir ../../output/bin/docs/html
+if [ ! -d "../../output/bin/Documentation/html" ]; then
+    mkdir ../../output/bin/Documentation/html
 fi
-cp -rf ../../docs/build/html ../../output/bin/docs
+cp -rf ../../Documentation/build/html ../../output/bin/Documentation
 
 # Copy the GUI launch script.
 cp ./RadeonGPUAnalyzerGUI ../../output/bin/
 chmod +x ../../output/bin/RadeonGPUAnalyzerGUI
+

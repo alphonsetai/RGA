@@ -210,7 +210,7 @@ void kcCLICommanderCL::RunCompileCommands(const Config& config, LoggingCallBackF
 {
     if (Init(config, callback))
     {
-        if (InitRequestedAsicList(config, m_externalDevices, m_asics, callback))
+        if (InitRequestedAsicList(config, m_externalDevices, m_asics, false))
         {
             if (Compile(config))
             {
@@ -342,8 +342,10 @@ void kcCLICommanderCL::Analysis(const Config& config)
                 output << analysis.LDSSizeUsed << csvSeparator;
                 output << doNAFormat(analysis.numSGPRsAvailable, CAL_NA_Value_64, CAL_ERR_Value_64, csvSeparator);
                 output << doNAFormat(analysis.numSGPRsUsed, CAL_NA_Value_64, CAL_ERR_Value_64, csvSeparator);
+                output << doNAFormat(CAL_NA_Value_64, CAL_NA_Value_64, CAL_ERR_Value_64, csvSeparator);
                 output << doNAFormat(analysis.numVGPRsAvailable, CAL_NA_Value_64, CAL_ERR_Value_64, csvSeparator);
                 output << doNAFormat(analysis.numVGPRsUsed, CAL_NA_Value_64, CAL_ERR_Value_64, csvSeparator);
+                output << doNAFormat(CAL_NA_Value_64, CAL_NA_Value_64, CAL_ERR_Value_64, csvSeparator);
                 output << doNAFormat(analysis.numThreadPerGroupX, CAL_NA_Value_64, CAL_ERR_Value_64, csvSeparator);
                 output << doNAFormat(analysis.numThreadPerGroupY, CAL_NA_Value_64, CAL_ERR_Value_64, csvSeparator);
                 output << doNAFormat(analysis.numThreadPerGroupZ, CAL_NA_Value_64, CAL_ERR_Value_64, csvSeparator);
@@ -421,7 +423,7 @@ void kcCLICommanderCL::GetILText(const Config& config)
 void kcCLICommanderCL::GetISAText(const Config& config)
 {
     if (!config.m_ISAFile.empty() || !config.m_AnalysisFile.empty() ||
-        !config.m_ControlFlowGraphFile.empty() || !config.m_LiveRegisterAnalysisFile.empty())
+        !config.m_blockCFGFile.empty() || !config.m_instCFGFile.empty() || !config.m_LiveRegisterAnalysisFile.empty())
     {
         bool isIsaFileTemp = config.m_ISAFile.empty();
 
@@ -480,18 +482,17 @@ void kcCLICommanderCL::GetISAText(const Config& config)
                         }
 
                         // Generate control flow graph.
-                        bool isCfgRequired = !config.m_ControlFlowGraphFile.empty();
-
-                        if (isCfgRequired)
+                        if (!config.m_blockCFGFile.empty() || !config.m_instCFGFile.empty())
                         {
                             gtString cfgOutputFileName;
-                            kcUtils::ConstructOutputFileName(config.m_ControlFlowGraphFile, KC_STR_DEFAULT_CFG_SUFFIX,
+                            std::string baseName = (!config.m_blockCFGFile.empty() ? config.m_blockCFGFile : config.m_instCFGFile);
+                            kcUtils::ConstructOutputFileName(baseName, KC_STR_DEFAULT_CFG_EXT,
                                                              kernelName, deviceName, cfgOutputFileName);
 
                             // Call the kcUtils routine to analyze <generatedFileName> and write
                             // the analysis file.
-                            kcUtils::GenerateControlFlowGraph(isaOutputFileName, cfgOutputFileName,
-                                                                 m_LogCallback, config.m_printProcessCmdLines);
+                            kcUtils::GenerateControlFlowGraph(isaOutputFileName, cfgOutputFileName, m_LogCallback,
+                                                              !config.m_instCFGFile.empty(), config.m_printProcessCmdLines);
                         }
 
                         // Delete temporary files.

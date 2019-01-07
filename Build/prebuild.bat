@@ -52,6 +52,7 @@ if "%1"=="--qt" goto :set_qt
 if "%1"=="--cli-only" goto :set_cli_only
 if "%1"=="--gui-only" goto :set_gui_only
 if "%1"=="--no-fetch" goto :set_no_update
+if "%1"=="--x86" goto :set_32bit
 goto :bad_arg
 
 :set_cmake
@@ -77,6 +78,9 @@ goto :shift_arg
 :set_no_update
 set NO_UPDATE=TRUE
 goto :shift_arg
+:set_32bit
+set BUILD_32BIT=TRUE
+goto :shift_arg
 
 :shift_2args
 rem Shift to the next pair of arguments
@@ -92,10 +96,18 @@ exit /b
 :start_cmake
 
 if "%VS_VER%"=="2015" (
-    set CMAKE_VS="Visual Studio 14 2015 Win64"
+    if "%BUILD_32BIT%"=="TRUE" (
+        set CMAKE_VS="Visual Studio 14 2015"
+    ) else (
+        set CMAKE_VS="Visual Studio 14 2015 Win64"
+    )
 ) else (
     if "%VS_VER%"=="2017" (
-        set CMAKE_VS="Visual Studio 15 2017 Win64"
+        if "%BUILD_32BIT%"=="TRUE" (
+            set CMAKE_VS="Visual Studio 15 2017"
+        ) else (
+            set CMAKE_VS="Visual Studio 15 2017 Win64"
+        )
     ) else (
         echo Error: Unknows VisualStudio version provided. Aborting...
         exit /b

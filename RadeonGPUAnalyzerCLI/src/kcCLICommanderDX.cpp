@@ -25,6 +25,9 @@
 const int  DX_MAX_SUPPORTED_SHADER_MODEL_MAJOR = 5;
 const int  DX_MAX_SUPPORTED_SHADER_MODEL_MINOR = 0;
 
+static const std::string  s_STR_NA_VALUE = "N/A";
+
+
 kcCLICommanderDX::kcCLICommanderDX(void)
 {
     m_pBackEndHandler = nullptr;
@@ -72,7 +75,7 @@ void kcCLICommanderDX::InitRequestedAsicListDX(const Config& config)
 
         if (beUtils::GetAllGraphicsCards(dxDeviceTable, supportedDevices))
         {
-            if (InitRequestedAsicList(config, supportedDevices, matchedTargets, m_LogCallback))
+            if (InitRequestedAsicList(config, supportedDevices, matchedTargets, false))
             {
                 for (const std::string& target : matchedTargets)
                 {
@@ -92,8 +95,7 @@ void kcCLICommanderDX::InitRequestedAsicListDX(const Config& config)
 
 
 void kcCLICommanderDX::ExtractISA(const string& deviceName, const Config& config, size_t& isaSizeInBytes,
-                                  string isaBuffer, bool& isIsaSizeDetected, bool& shouldDetectIsaSize,
-                                  const bool bRegisterLiveness, const bool bControlFlow)
+                                  string isaBuffer, bool& isIsaSizeDetected, bool& shouldDetectIsaSize)
 {
     beProgramBuilderDX* pProgramBuilderDX =  m_pBackEndHandler != nullptr ? m_pBackEndHandler->theOpenDXBuilder() : nullptr;
     beStatus backendRet = beStatus_Invalid;
@@ -142,7 +144,7 @@ void kcCLICommanderDX::ExtractISA(const string& deviceName, const Config& config
             // If we managed to detect the ISA size, don't do it again.
             shouldDetectIsaSize = !isIsaSizeDetected;
 
-            if (bRegisterLiveness)
+            if (!config.m_LiveRegisterAnalysisFile.empty())
             {
                 gtString liveRegAnalysisOutputFileName;
                 kcUtils::ConstructOutputFileName(config.m_LiveRegisterAnalysisFile, KC_STR_DEFAULT_LIVE_REG_ANALYSIS_SUFFIX,
@@ -154,14 +156,15 @@ void kcCLICommanderDX::ExtractISA(const string& deviceName, const Config& config
                                                      m_LogCallback, config.m_printProcessCmdLines);
             }
 
-            if (bControlFlow)
+            if (!config.m_instCFGFile.empty() || !config.m_blockCFGFile.empty())
             {
                 gtString cfgOutputFileName;
-                kcUtils::ConstructOutputFileName(config.m_ControlFlowGraphFile, KC_STR_DEFAULT_CFG_SUFFIX,
+                std::string baseName = (!config.m_instCFGFile.empty() ? config.m_instCFGFile : config.m_blockCFGFile);
+                kcUtils::ConstructOutputFileName(baseName, KC_STR_DEFAULT_CFG_EXT,
                                                  config.m_Function, deviceName, cfgOutputFileName);
 
-                kcUtils::GenerateControlFlowGraph(isaOutputFileName, cfgOutputFileName,
-                                                  m_LogCallback, config.m_printProcessCmdLines);
+                kcUtils::GenerateControlFlowGraph(isaOutputFileName, cfgOutputFileName, m_LogCallback,
+                                                  !config.m_instCFGFile.empty(),  config.m_printProcessCmdLines);
             }
 
             // Delete temporary ISA file.
@@ -310,12 +313,12 @@ void kcCLICommanderDX::RunCompileCommands(const Config& config, LoggingCallBackF
 
     if (isInitSuccessful)
     {
-        const bool bISA = config.m_ISAFile.length() > 0;
-        const bool bIL = config.m_ILFile.length() > 0;
-        const bool bStatistics = config.m_AnalysisFile.length() > 0;
-        const bool bRegisterLiveness = config.m_LiveRegisterAnalysisFile.length() > 0;
-        const bool bControlFlow = config.m_ControlFlowGraphFile.length() > 0;
-        const bool bBinaryOutput = config.m_BinaryOutputFile.length() > 0;
+        const bool bISA = !config.m_ISAFile.empty();
+        const bool bIL = !config.m_ILFile.empty();
+        const bool bStatistics = !config.m_AnalysisFile.empty();
+        const bool bBinaryOutput = !config.m_BinaryOutputFile.empty();
+        const bool bLivereg = !config.m_LiveRegisterAnalysisFile.empty();
+        const bool bCfg = (!config.m_instCFGFile.empty() || !config.m_blockCFGFile.empty());
 
         vector <AnalysisData> AnalysisDataVec;
         vector <string> DeviceAnalysisDataVec;
@@ -391,9 +394,9 @@ void kcCLICommanderDX::RunCompileCommands(const Config& config, LoggingCallBackF
                 bool shouldDetectIsaSize = true;
                 size_t isaSizeInBytes(0);
 
-                if (bISA || bRegisterLiveness || bStatistics || bControlFlow)
+                if (bISA || bStatistics || bLivereg || bCfg)
                 {
-                    ExtractISA(deviceName, config, isaSizeInBytes, isaBuffer, isIsaSizeDetected, shouldDetectIsaSize, bRegisterLiveness, bControlFlow);
+                    ExtractISA(deviceName, config, isaSizeInBytes, isaBuffer, isIsaSizeDetected, shouldDetectIsaSize);
                 }
                 if (bIL)
                 {
@@ -401,8 +404,8 @@ void kcCLICommanderDX::RunCompileCommands(const Config& config, LoggingCallBackF
                 }
                 if (bStatistics)
                 {
-                    isIsaSizeDetected = ExtractStats(deviceName, config, shouldDetectIsaSize, isaBuffer, isIsaSizeDetected, isaSizeInBytes, AnalysisDataVec, DeviceAnalysisDataVec);
-
+                    isIsaSizeDetected = ExtractStats(deviceName, config, shouldDetectIsaSize, isaBuffer, isIsaSizeDetected,
+                                                     isaSizeInBytes, AnalysisDataVec, DeviceAnalysisDataVec);
                 }
             }
 
@@ -500,11 +503,17 @@ bool kcCLICommanderDX::WriteAnalysisDataForDX(const Config& config, const std::v
                 // Used SGPRs.
                 output << ad.numSGPRsUsed << csvSeparator;
 
+                // SGPR spills.
+                output << s_STR_NA_VALUE << csvSeparator;
+
                 // Available VGPRs.
                 output << ad.numVGPRsAvailable << csvSeparator;
 
                 // Used VGPRs.
                 output << ad.numVGPRsUsed << csvSeparator;
+
+                // VGPR spills.
+                output << s_STR_NA_VALUE << csvSeparator;
 
                 // CL Work-group dimensions (for a unified format, to be revisited).
                 output << ad.numThreadPerGroupX << csvSeparator;
